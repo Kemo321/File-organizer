@@ -1,0 +1,4 @@
+desired_mode=rw-r--r--
+problematic_chars=:\".;*?$#'|\\
+substitute_char=.
+temp_extensions=.tmp,~
