@@ -3,313 +3,116 @@
 
 # File Cleaning and Organizing Tool
 
-A Python-based tool for cleaning and organizing files within one or more directories. This tool uses only built-in modules and is designed to detect and manage issues such as empty files, temporary files, duplicate files, files with identical names (but different modification times), files with problematic characters in their names, and files with non-standard permissions.
-
-## Table of Contents
-
-- [Introduction](#introduction)
-- [Features](#features)
-- [Requirements](#requirements)
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [Usage](#usage)
-  - [Command-Line Arguments](#command-line-arguments)
-  - [Modes and Examples](#modes-and-examples)
-    - [Empty Files](#empty-files)
-    - [Temporary Files](#temporary-files)
-    - [Duplicate Files](#duplicate-files)
-    - [Same-Name Files](#same-name-files)
-    - [File Attributes](#file-attributes)
-    - [Problematic File Names](#problematic-file-names)
-    - [Running All Operations](#running-all-operations)
-- [Test Directory Generation](#test-directory-generation)
-- [Troubleshooting](#troubleshooting)
-- [License](#license)
-
-## Introduction
-
-Managing large collections of files scattered over multiple directories can be challenging—especially when issues like duplicates, empty files, and inconsistent naming or permissions occur. This tool provides a simple, interactive way to identify and clean up such issues.
-
-The script is organized into two primary classes:
-- **ArgParser**: Handles all command-line argument parsing.
-- **FileCleaner**: Encapsulates file cleaning operations, including deletion, renaming, permission changes, and duplicate detection.
 
 ## Features
 
-- **Empty Files**: Identify and optionally delete empty files.
-- **Temporary Files**: Detect and remove files with temporary extensions (e.g., `.tmp`, `~`).
-- **Duplicate Files**: Locate duplicate files (based on MD5 hash) and keep only the oldest version.
-- **Same-Name Files**: Identify files with the same name across directories and retain only the newest version.
-- **File Attributes**: Check and adjust file permissions to a desired mode.
-- **Problematic File Names**: Detect file names with problematic characters (e.g., `:`, `?`, `*`) and offer to rename them using a substitute character.
+- **Empty Files**: Detects and removes files with zero size.
+- **Temporary Files**: Identifies and deletes files with user-defined temporary extensions.
+- **Duplicates**: Finds and removes duplicate files based on content (MD5 hash), keeping the oldest version.
+- **Same Name Files**: Locates files with identical names across directories, keeping the newest and offering to delete older versions.
+- **File Attributes**: Checks and corrects file permissions to a specified mode.
+- **Rename Files**: Renames files with problematic characters, replacing them with a substitute character.
 
-## Requirements
+## Usage
 
-- **Python 3.x**: Ensure you have Python 3 installed.
-- **Operating System**: Unix-like systems are recommended (due to permission handling), though the script can also run on Windows with some limitations.
+Run the tool using this command:
 
-## Installation
+```bash
+python clean_files.py [mode] directory1 [directory2 ...]
+```
 
-1. **Clone or Download the Repository:**
+- **`mode`** (optional): Specifies the operation to perform. If omitted, all operations run by default. Options:
+  - `empty`: Remove empty files.
+  - `temp`: Remove temporary files.
+  - `dups`: Remove duplicate files.
+  - `same`: Remove older files with the same name.
+  - `attrib`: Correct file permissions.
+  - `rename`: Rename files with problematic characters.
+  - `all`: Execute all operations (default if no mode is specified).
+- **`directory1 [directory2 ...]`**: One or more directories to process.
 
+### Examples
+
+1. **Remove empty files from a directory**:
    ```bash
-   git clone https://github.com/yourusername/file-cleaner.git
+   python clean_files.py empty mydir
    ```
 
-   Or download the ZIP and extract it.
-
-2. **Verify Python Version:**
-
+2. **Run all operations on multiple directories**:
    ```bash
-   python3 --version
+   python clean_files.py dir1 dir2
    ```
-
-3. **(Optional) Make the Script Executable:**
-
+   or
    ```bash
-   chmod +x clean_files.py
+   python clean_files.py all dir1 dir2
    ```
 
 ## Configuration
 
-The tool reads its configuration from a file at `$HOME/.clean_files`. If this file does not exist, default values are used.
+The tool reads settings from a `.clean_files` file in the current working directory. If absent or invalid, it falls back to defaults. The file uses a key-value format (`key=value`).
 
-Example configuration (`~/.clean_files`):
+Supported options:
+- **`desired_mode`**: File permission mode in symbolic notation (e.g., `rw-r--r--` for owner read/write, others read). Default: `rw-r--r--` (octal `0644`).
+- **`problematic_chars`**: Characters flagged as problematic in filenames. Default: `:".;*?$#'|\`.
+- **`substitute_char`**: Replacement character for problematic characters. Default: `.`.
+- **`temp_extensions`**: Comma-separated list of temporary file extensions. Default: `.tmp,~`.
 
-```ini
+**Example `.clean_files`**:
+```
 desired_mode=rw-r--r--
-problematic_chars=:\".;*?$#'|\
-substitute_char=.
-temp_extensions=.tmp,~
+problematic_chars=:".;*?$#'|\
+substitute_char=_
+temp_extensions=.tmp,.temp,~
 ```
 
-- **desired_mode**: Target permission mode for files (symbolic format).
-- **problematic_chars**: Characters in file names that may cause issues.
-- **substitute_char**: The character to replace problematic characters.
-- **temp_extensions**: Comma-separated list of file extensions considered temporary.
+## Operations Details
 
-## Usage
+- **Empty Files**: Finds files with zero bytes and prompts for deletion.
+- **Temporary Files**: Targets files with extensions from `temp_extensions` and prompts for deletion.
+- **Duplicates**: Uses MD5 hashing to detect identical content, sorts by modification time, keeps the oldest, and prompts to delete newer duplicates.
+- **Same Name Files**: Groups files by name across directories, sorts by modification time, keeps the newest, and prompts to delete older ones.
+- **File Attributes**: Compares permissions to `desired_mode` and prompts to adjust mismatches.
+- **Rename Files**: Identifies filenames with `problematic_chars` and prompts to rename using `substitute_char`.
 
-The tool accepts two positional arguments:
+## Interactive Prompts
 
-1. **mode** (optional): Specifies which cleaning operation to perform.
-   - Allowed modes: `empty`, `temp`, `dups`, `same`, `attrib`, `rename`
-   - If omitted (or an empty string is provided), all operations are executed.
+For each file matching an operation’s criteria, the tool asks for input:
+- **`y`**: Yes, perform the action (e.g., delete, rename).
+- **`n`**: No, skip this file.
+- **`a`**: Always perform the action for all similar files without further prompts.
 
-2. **directories** (required): One or more directories to process.
+**Example**: Choosing `a` when deleting empty files will remove all empty files automatically.
 
-### Command-Line Arguments
+## Testing the Tool
 
-The built-in `ArgParser` class encapsulates the command-line parsing using Python’s `argparse` module. For example, to run the tool on a directory called `test_dir` in duplicate mode, you would use:
+A helper script, `create_test_structure.py`, sets up a test environment:
 
 ```bash
-python clean_files.py dups test_dir
+python create_test_structure.py
 ```
 
-### Modes and Examples
+This generates a `test_dir` containing:
+- Empty file (`empty.txt`).
+- Temporary file (`temp_file.tmp`).
+- Duplicate files (`duplicate.txt`, `duplicate_copy.txt`).
+- Same-name files (`same.txt` in subdirectories with varying times).
+- Problematic filename (`problematic:file?name.txt`).
+- File with odd permissions (`bad_permissions.txt`, mode `0777`).
 
-#### Empty Files
-
-Find and process empty files:
-
+Test the tool with:
 ```bash
-python clean_files.py empty test_dir
+python clean_files.py test_dir
 ```
 
-*Expected prompt:*
-```
-Empty file: /path/to/test_dir/subdir1/empty.txt
-Delete? (y - yes, n - no, a - always delete):
-```
+## Dependencies
 
-#### Temporary Files
+The tool uses only Python standard libraries (`os`, `sys`, `hashlib`, `argparse`), requiring no external packages.
 
-Find temporary files (based on extensions):
+## Notes
 
-```bash
-python clean_files.py temp test_dir
-```
+- **Recursive**: Processes directories and subdirectories via `os.walk`.
+- **Time-Based**: Uses modification times (`st_mtime`) to determine oldest/newest files.
+- **Limitations**: Ignores symbolic links and special files (e.g., sockets).
+- **Permissions**: Requires read/write access to files and directories to function properly.
 
-*Expected prompt:*
-```
-Temporary file: /path/to/test_dir/subdir1/temp_file.tmp
-Delete? (y - yes, n - no, a - always delete):
-```
-
-#### Duplicate Files
-
-Detect duplicates (using MD5 hash) and delete extra copies:
-
-```bash
-python clean_files.py dups test_dir
-```
-
-*Expected prompt:*
-```
-Duplicates found for file (oldest retained): /path/to/test_dir/subdir1/duplicate.txt
-Copy: /path/to/test_dir/subdir2/duplicate_copy.txt (mtime: 1623456789)
-Delete this copy? (y - yes, n - no, a - always delete):
-```
-
-#### Same-Name Files
-
-Identify files with the same name across directories:
-
-```bash
-python clean_files.py same test_dir
-```
-
-*Expected prompt:*
-```
-Files with name: same.txt
-Retained version (newest): /path/to/test_dir/subdir2/same.txt
-Older version: /path/to/test_dir/subdir1/same.txt (mtime: 1623456780)
-Delete this older version? (y - yes, n - no, a - always delete):
-```
-
-#### File Attributes
-
-Check file permissions and adjust to the desired mode:
-
-```bash
-python clean_files.py attrib test_dir
-```
-
-*Expected prompt:*
-```
-File: /path/to/test_dir/bad_permissions.txt
-Current permissions: 0o777 Expected: 0o644
-Change permissions? (y - yes, n - no, a - always change):
-```
-
-#### Problematic File Names
-
-Find and rename files with problematic characters:
-
-```bash
-python clean_files.py rename test_dir
-```
-
-*Expected prompt:*
-```
-File with problematic name: /path/to/test_dir/problematic:file?name.txt
-Proposed new name: /path/to/test_dir/problematic.file.name.txt
-Rename? (y - yes, n - no, a - always rename):
-```
-
-#### Running All Operations
-
-To run **all operations** sequentially, provide an empty string as the mode:
-
-```bash
-python clean_files.py "" test_dir
-```
-
-This will execute empty file deletion, temporary file cleanup, duplicate file detection, same-name file processing, permission adjustments, and file renaming in one run.
-
-## Test Directory Generation
-
-A helper script, `create_test_dir.py`, is provided to generate a sample test directory structure with files covering all functionalities.
-
-### Steps:
-
-1. **Save the following script as `create_test_dir.py`:**
-
-   ```python
-   import os
-   import time
-
-   def create_test_structure(base_dir="test_dir"):
-       """
-       Creates a test directory structure with files for testing the cleaning script.
-       
-       The structure includes:
-         - An empty file.
-         - A temporary file (.tmp).
-         - Duplicate files with identical content.
-         - Files with the same name but different modification times.
-         - A file with problematic characters in its name.
-         - A file with non-standard permissions.
-       """
-       os.makedirs(base_dir, exist_ok=True)
-       subdirs = ["subdir1", "subdir2"]
-       for sub in subdirs:
-           os.makedirs(os.path.join(base_dir, sub), exist_ok=True)
-       
-       # 1. Create an empty file in subdir1
-       empty_file = os.path.join(base_dir, "subdir1", "empty.txt")
-       with open(empty_file, "w") as f:
-           pass
-
-       # 2. Create a temporary file (.tmp) in subdir1
-       temp_file = os.path.join(base_dir, "subdir1", "temp_file.tmp")
-       with open(temp_file, "w") as f:
-           f.write("This is a temporary file.")
-
-       # 3. Create duplicate files (same content, different locations)
-       duplicate_content = "This is duplicate content."
-       dup_file1 = os.path.join(base_dir, "subdir1", "duplicate.txt")
-       dup_file2 = os.path.join(base_dir, "subdir2", "duplicate_copy.txt")
-       with open(dup_file1, "w") as f:
-           f.write(duplicate_content)
-       with open(dup_file2, "w") as f:
-           f.write(duplicate_content)
-
-       # 4. Create files with the same name in subdir1 and subdir2 with different modification times
-       same_name1 = os.path.join(base_dir, "subdir1", "same.txt")
-       same_name2 = os.path.join(base_dir, "subdir2", "same.txt")
-       with open(same_name1, "w") as f:
-           f.write("Version 1: older content.")
-       time.sleep(1)
-       with open(same_name2, "w") as f:
-           f.write("Version 2: newer content.")
-
-       # 5. Create a file with problematic characters in its name in the base directory
-       problematic_file = os.path.join(base_dir, "problematic:file?name.txt")
-       with open(problematic_file, "w") as f:
-           f.write("File with problematic characters in its name.")
-
-       # 6. Create a file with non-standard permissions (e.g., 0777 instead of the desired 0644)
-       perm_file = os.path.join(base_dir, "bad_permissions.txt")
-       with open(perm_file, "w") as f:
-           f.write("This file has non-standard permissions.")
-       os.chmod(perm_file, 0o777)
-
-       print("Test directory structure created in:", os.path.abspath(base_dir))
-
-   if __name__ == "__main__":
-       create_test_structure()
-   ```
-
-2. **Run the test generator:**
-
-   ```bash
-   python create_test_dir.py
-   ```
-
-   This will create a directory named `test_dir` with the following structure:
-
-   ```
-   test_dir/
-   ├── bad_permissions.txt
-   ├── problematic:file?name.txt
-   ├── subdir1/
-   │   ├── empty.txt
-   │   ├── temp_file.tmp
-   │   ├── duplicate.txt
-   │   └── same.txt
-   └── subdir2/
-       ├── duplicate_copy.txt
-       └── same.txt
-   ```
-
-## Troubleshooting
-
-- **Permission Issues:**  
-  If you encounter permission errors (e.g., when deleting or modifying files), ensure you have the required privileges. You might need to run the script as an administrator or with `sudo` on Unix-like systems.
-
-- **Configuration Problems:**  
-  Verify that your `~/.clean_files` file is correctly formatted (using `key=value` pairs) and contains valid values.
-
-- **Interactive Prompts:**  
-  This tool is interactive. If you are running it in an environment that does not support interactive input, try running the script directly in a terminal.
+---
